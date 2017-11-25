@@ -31,9 +31,12 @@
 /* Create a WiFi access point and provide a web server on it. */
 // Cerevo.Inc modefy 2015/9/6
 
+// Espressif ESP8266を使ってミニ四駆をラジコン化する
+// FREE WING modify 2017/11/25
+// http://www.neko.ne.jp/~freewing/hardware/espressif_esp8266_mini_yonku_radio_control/
 
 #include <ESP8266WiFi.h>
-#include <WiFiClient.h> 
+#include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 
 /* Set these to your desired credentials. */
@@ -47,22 +50,32 @@ ESP8266WebServer server(80);
 
 /* set I2C library*/
 #include <Wire.h>
-#define ADDR  0x64
 
-#define command_start  0
-#define command_stop   1
-#define command_back  2
+//#define ADDR	0x64
+// FREE WING modify 2017/11/25
+// A0='L', A1='L' = 0xC0h
+#define ADDR	0x60
+
+// FREE WING add 2017/11/25
+#define MOTOR_IN_STANDBY	0b00
+#define MOTOR_IN_REVERSE	0b01
+#define MOTOR_IN_NORMAL		0b10
+#define MOTOR_IN_BRAKE		0b11
+
+#define command_start	0
+#define command_stop	1
+#define command_back	2
 
 char state = command_stop;
 
 String form ="<html><head><meta name=viewport content=width=100></head>"
-"<form action=start><input type= submit  value=start  target=tif></form>"
+"<form action=start><input type= submit	value=start	target=tif></form>"
 "<form action=back><input type=submit value=back target=tif></form>"
 "<form action=stop><input type=submit value=stop target=tif></form>"
 "<iframe src=javascript:false style=display:none name=tif id=tif></iframe>"
 "</html>";
 
-/* Just a little test message.  Go to http://192.168.4.1 in a web browser
+/* Just a little test message.	Go to http://192.168.4.1 in a web browser
  * connected to this access point to see it.
  */
 void setup() {
@@ -71,9 +84,11 @@ void setup() {
 	Serial.println();
 	Serial.print("Configuring access point...");
 
-  Wire.begin(4, 14);
-  delay(40);
-  
+	// FREE WING modify 2017/11/25
+//	Wire.begin(4, 14);
+	Wire.begin(); // 4, 5 // (SDA, SCL)
+	delay(40);
+
 	/* You can remove the password parameter if you want the AP to be open. */
 	WiFi.softAP(ssid, password);
 
@@ -82,15 +97,15 @@ void setup() {
 	Serial.println(myIP);
 	server.on("/", handleRoot);
 
-  // And as regular external functions:
-  server.on("/stop", handle_stop);
-  server.on("/start", handle_start);
-  server.on("/back", handle_back);
+	// And as regular external functions:
+	server.on("/stop", handle_stop);
+	server.on("/start", handle_start);
+	server.on("/back", handle_back);
 
- 
 	server.begin();
 	Serial.println("HTTP server started");
 }
+
 
 void loop() {
 	server.handleClient();
@@ -98,148 +113,109 @@ void loop() {
 
 
 void handleRoot() {
-  server.send(200, "text/html", form);
+	server.send(200, "text/html", form);
 }
 
 
 void handle_stop() {
-  Serial.print("stop");
+	Serial.print("stop");
 
-  if((state == command_start)||(state == command_back)) {
-    stop_motor();
-  
-    state = command_stop;
-  }
-  
-  server.send(200, "text/html", form);
+	if((state == command_start)||(state == command_back)) {
+		stop_motor();
+
+		state = command_stop;
+	}
+
+	server.send(200, "text/html", form);
 }
+
 
 void handle_start() {
-  Serial.print("start");
+	Serial.print("start");
 
-  if(state == command_back){
-    
-     stop_motor();
+	if(state == command_back){
 
-     delay(10);
+		stop_motor();
+		delay(10);
 
-     start_motor();
-  
-  }else if(state == command_stop){
-    start_motor();
-  }
+		start_motor();
 
-  state = command_start;
-  
-  server.send(200, "text/html", form);
+	}else if(state == command_stop){
+		start_motor();
+	}
+
+	state = command_start;
+	server.send(200, "text/html", form);
 }
+
 
 void handle_back() {
-  Serial.print("back");
-  if(state == command_start){
-    
-     stop_motor();
+	Serial.print("back");
 
-     delay(10);
+	if(state == command_start){
 
-     reverse_motor();
-  
-  }else if(state == command_stop){
-    reverse_motor();
+		stop_motor();
+		delay(10);
 
-  }
-  state = command_back;
-  server.send(200, "text/html", form);
-}
+		reverse_motor();
 
-void start_motor(){
-  
-  Wire.beginTransmission(ADDR);
-  Wire.write(0x00);
-  Wire.write(0x19);
-  Wire.endTransmission();
-  
-   delay(10);
+	}else if(state == command_stop){
+		reverse_motor();
+	}
 
-    Wire.beginTransmission(ADDR);
-  Wire.write(0x00);
-  Wire.write(0x35);
-  Wire.endTransmission();
-
-     delay(10);
-
-    Wire.beginTransmission(ADDR);
-  Wire.write(0x00);
-  Wire.write(0x65);
-  Wire.endTransmission();
-
-      delay(10);
-
-    Wire.beginTransmission(ADDR);
-  Wire.write(0x00);
-  Wire.write(0xC9);
-  Wire.endTransmission();
-
-       delay(10);
-
-    Wire.beginTransmission(ADDR);
-  Wire.write(0x00);
-  Wire.write(0xFD);
-  Wire.endTransmission();
-
-   
-}
-
-void reverse_motor(){
-  
-  Wire.beginTransmission(ADDR);
-  Wire.write(0x00);
-  Wire.write(0x1A);
-  Wire.endTransmission();
-  
-   delay(10);
-
-    Wire.beginTransmission(ADDR);
-  Wire.write(0x00);
-  Wire.write(0x36);
-  Wire.endTransmission();
-  
-   delay(10);
-
-    Wire.beginTransmission(ADDR);
-  Wire.write(0x00);
-  Wire.write(0x66);
-  Wire.endTransmission();
-
-        delay(10);
-
-    Wire.beginTransmission(ADDR);
-  Wire.write(0x00);
-  Wire.write(0xCA);
-  Wire.endTransmission();
-
-         delay(10);
-
-    Wire.beginTransmission(ADDR);
-  Wire.write(0x00);
-  Wire.write(0xFE);
-  Wire.endTransmission();
-   
+	state = command_back;
+	server.send(200, "text/html", form);
 }
 
 
-void stop_motor(){
+// FREE WING add 2017/11/25
+void write_motor(int motor_in, int vset) {
 
-  Wire.beginTransmission(ADDR);
-  Wire.write(0x00);
-  Wire.write(0x18);
-  Wire.endTransmission();
-  
-  delay(10);
+	Wire.beginTransmission(ADDR);
+	Wire.write(0x00);
+	Wire.write((vset << 2) + motor_in);
+	Wire.endTransmission();
+}
 
-  Wire.beginTransmission(ADDR);
-  Wire.write(0x00);
-  Wire.write(0x1B);
-  Wire.endTransmission();
-  
+void start_motor() {
+
+	int motor_in = MOTOR_IN_NORMAL;
+	int vset = 0x06;
+	write_motor(motor_in, vset);
+	delay(10);
+
+	vset = 0x0d;
+	write_motor(motor_in, vset);
+	delay(10);
+
+	vset = 0x10;
+	write_motor(motor_in, vset);
+}
+
+
+void reverse_motor() {
+
+	int motor_in = MOTOR_IN_REVERSE;
+	int vset = 0x06;
+	write_motor(motor_in, vset);
+	delay(10);
+
+	vset = 0x0d;
+	write_motor(motor_in, vset);
+	delay(10);
+
+	vset = 0x10;
+	write_motor(motor_in, vset);
+}
+
+
+void stop_motor() {
+
+	int motor_in = MOTOR_IN_STANDBY;
+	int vset = 0x06;
+	write_motor(motor_in, vset);
+	delay(10);
+
+	motor_in = MOTOR_IN_BRAKE;
+	write_motor(motor_in, vset);
 }
